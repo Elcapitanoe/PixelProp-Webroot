@@ -1,0 +1,16 @@
+{
+  "repositories": [
+    {
+      "name": "Build-Prop-BETA",
+      "owner": "Elcapitanoe",
+      "description": "Module Repository",
+      "url": "https://github.com/Elcapitanoe/Build-Prop-BETA"
+    },
+    {
+      "name": "PixelProp-Website",
+      "owner": "Elcapitanoe",
+      "description": "Website Source",
+      "url": "https://github.com/Elcapitanoe/PixelProp-Website"
+    }
+  ]
+}
