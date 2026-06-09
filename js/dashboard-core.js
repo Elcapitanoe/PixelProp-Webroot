@@ -97,7 +97,7 @@ async function synchronizeSystemProperties() {
     document.getElementById('mod-version').textContent = version;
     document.getElementById('mod-desc').textContent = description;
 
-    verifyReleaseStatus(version);
+    verifyReleaseStatus(description);
 
     const { errno, stdout, stderr } = await executeNativeCommand(
       `cat "${modulePath}/pif.json"`
