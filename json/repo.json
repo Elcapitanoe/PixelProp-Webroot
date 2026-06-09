@@ -11,6 +11,12 @@
       "owner": "Elcapitanoe",
       "description": "Website Source",
       "url": "https://github.com/Elcapitanoe/PixelProp-Website"
+    },
+    {
+      "name": "PixelProp-Webroot",
+      "owner": "Elcapitanoe",
+      "description": "WebUI/Webroot Source",
+      "url": "https://github.com/Elcapitanoe/PixelProp-Webroot"
     }
   ]
 }
