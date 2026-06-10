@@ -1,5 +1,7 @@
 import { Console } from './core-telemetry.js';
 
+const COMMAND_TIMEOUT_MS = 10000;
+
 let callbackIdCounter = 0;
 
 function getCallbackName(prefix) {
@@ -14,7 +16,7 @@ export function executeNativeCommand(command) {
       Console.error(`Command timeout: ${command}`);
       delete window[callbackName];
       resolve({ errno: -1, stdout: '', stderr: 'Execution timeout' });
-    }, 10000);
+    }, COMMAND_TIMEOUT_MS);
 
     window[callbackName] = (errno, stdout, stderr) => {
       clearTimeout(timeoutId);
@@ -32,8 +34,8 @@ export function executeNativeCommand(command) {
     } catch (error) {
       clearTimeout(timeoutId);
       Console.error(`KSU Exception: ${error.message}`);
-      reject(error);
       delete window[callbackName];
+      reject(error);
     }
   });
 }
@@ -44,6 +46,7 @@ export async function fetchSystemOutput(command, fallback = 'Not Found') {
     if (errno === 0 && stdout.trim() !== '') return stdout.trim();
     return fallback;
   } catch (error) {
+    Console.error(`Failed to fetch system output: ${error.message}`);
     return fallback;
   }
 }
