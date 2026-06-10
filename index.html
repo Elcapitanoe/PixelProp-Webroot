@@ -37,6 +37,18 @@
               <span class="prop-label">Description:</span>
               <span class="prop-value" id="mod-desc">Loading...</span>
             </li>
+            <li>
+              <span class="prop-label">Module Path:</span>
+              <span class="prop-value" id="module-path">Loading...</span>
+            </li>
+            <li>
+              <span class="prop-label">Module Properties File:</span>
+              <span class="prop-value" id="module-props-file">Loading...</span>
+            </li>
+            <li>
+              <span class="prop-label">Device Properties Source:</span>
+              <span class="prop-value">System build.prop</span>
+            </li>
           </ul>
         </div>
 
@@ -93,18 +105,6 @@
         </div>
       </main>
 
-      <main id="content-logs" class="page">
-        <div class="card">
-          <div class="card-header-action">
-            <h3>Execution Logs</h3>
-            <button id="btn-clear-logs" class="btn-secondary btn-sm">
-              Clear Logs
-            </button>
-          </div>
-          <div id="log-box" class="log-container hide-scrollbar"></div>
-        </div>
-      </main>
-
       <main id="content-about" class="page">
         <div class="card">
           <h3>Core Team</h3>
@@ -122,6 +122,71 @@
         </div>
       </main>
 
+      <main id="content-pif-tools" class="page">
+        <div class="pif-wizard">
+          <div class="wizard-content">
+            <div class="wizard-step active" data-step="1">
+              <div class="card">
+                <h4>Build Custom PIF Configuration</h4>
+                <p class="info-text">Select your device model and Android version to generate a custom PIF configuration from Google's Beta OTA releases.</p>
+                <div class="method-actions">
+                  <button id="start-custom-build" class="btn-primary">Start Custom Build</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="wizard-step" data-step="2">
+              <div class="card">
+                <h4>Select Device Model</h4>
+                <p class="info-text">Choose your device model from the available options.</p>
+                <div id="device-list" class="device-grid"></div>
+              </div>
+            </div>
+
+            <div class="wizard-step" data-step="3">
+              <div class="card">
+                <h4>Select Build Configuration</h4>
+                <p class="info-text">Choose the Android version and build for your device.</p>
+                <div id="build-list" class="build-options"></div>
+              </div>
+            </div>
+
+            <div class="wizard-step" data-step="4">
+              <div class="card">
+                <h4>Apply Configuration</h4>
+                <div id="apply-status" class="apply-status">
+                  <div class="status-item">
+                    <span class="status-label">PIF.json:</span>
+                    <span class="status-value" id="pif-status">Pending</span>
+                  </div>
+                  <div class="status-item">
+                    <span class="status-label">TrickyStore target.txt:</span>
+                    <span class="status-value" id="tricky-status">Pending</span>
+                  </div>
+                </div>
+                <div id="apply-result" class="apply-result hidden"></div>
+                <div id="apply-instructions" class="instructions-box hidden">
+                  <h5>Important Next Steps</h5>
+                  <ol>
+                    <li>Disconnect your device from Google account at <strong>myaccount.google.com/device-activity</strong></li>
+                    <li>Clear data from Google system apps (GMS, GSF, Google)</li>
+                    <li>Restart your device</li>
+                    <li>Reconnect and verify device shows as configured model</li>
+                  </ol>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="wizard-actions">
+            <button id="wizard-back" class="btn-secondary" disabled>Back</button>
+            <button id="wizard-next" class="btn-primary" disabled>Next</button>
+            <button id="wizard-apply" class="btn-primary hidden">Apply Configuration</button>
+            <button id="wizard-finish" class="btn-primary hidden">Finish</button>
+          </div>
+        </div>
+      </main>
+
       <main id="content-settings" class="page">
         <div class="notice-card">
           <strong class="notice-title">Development Notice</strong>
@@ -129,7 +194,7 @@
             This WebUI is in active development. If you encounter bugs or have
             suggestions, please report them to
             <a
-              href="javascript:void(0)"
+              href="#"
               data-url="https://github.com/Elcapitanoe/Build-Prop-BETA"
               >@Elcapitanoe/Build-Prop-BETA</a
             >.
@@ -154,11 +219,11 @@
 
     <nav class="bottom-nav">
       <button class="active nav-item" data-target="content-home">Home</button>
-      <button class="nav-item" data-target="content-logs">Logs</button>
+      <button class="nav-item" data-target="content-pif-tools">PIF Tools</button>
       <button class="nav-item" data-target="content-about">About</button>
       <button class="nav-item" data-target="content-settings">Settings</button>
     </nav>
-    
+
     <script type="module" src="js/dashboard-core.js"></script>
   </body>
 </html>

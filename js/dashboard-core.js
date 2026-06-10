@@ -7,6 +7,12 @@ import {
 import { verifyReleaseStatus } from './ota-manager.js';
 import { setupIntentLinks } from './intent-handler.js';
 import { renderAboutSections } from './about-renderer.js';
+import { initializePIFTools } from './pif-ui-manager.js';
+
+function escapeShellArg(arg) {
+  if (typeof arg !== 'string') return '';
+  return arg.replace(/'/g, "'\\''");
+}
 
 function setupNavigation() {
   document.querySelectorAll('.nav-item').forEach((navItem) => {
@@ -61,83 +67,97 @@ function setModuleFallbackLabels(message) {
   });
 }
 
-async function synchronizeSystemProperties() {
+export async function synchronizeSystemProperties() {
   Console.info('Starting hardware & module property sync...');
 
-  document.getElementById('dev-model').textContent = await fetchSystemOutput(
-    'getprop ro.product.model'
-  );
-  document.getElementById('dev-manufacturer').textContent =
-    await fetchSystemOutput('getprop ro.product.manufacturer');
-  document.getElementById('dev-fingerprint').textContent =
-    await fetchSystemOutput('getprop ro.build.fingerprint');
-  document.getElementById('dev-patch').textContent = await fetchSystemOutput(
-    'getprop ro.build.version.security_patch'
-  );
+  const [model, manufacturer, fingerprint, patch, sdk1, sdk2] =
+    await Promise.all([
+      fetchSystemOutput('getprop ro.product.model'),
+      fetchSystemOutput('getprop ro.product.manufacturer'),
+      fetchSystemOutput('getprop ro.build.fingerprint'),
+      fetchSystemOutput('getprop ro.build.version.security_patch'),
+      fetchSystemOutput('getprop ro.product.first_api_level', ''),
+      fetchSystemOutput('getprop ro.board.first_api_level', 'N/A'),
+    ]);
 
-  let sdk = await fetchSystemOutput('getprop ro.product.first_api_level', '');
-  if (sdk === '') {
-    sdk = await fetchSystemOutput('getprop ro.board.first_api_level', 'N/A');
-  }
-  document.getElementById('dev-sdk').textContent = sdk || 'N/A';
+  document.getElementById('dev-model').textContent = model;
+  document.getElementById('dev-manufacturer').textContent = manufacturer;
+  document.getElementById('dev-fingerprint').textContent = fingerprint;
+  document.getElementById('dev-patch').textContent = patch;
+  document.getElementById('dev-sdk').textContent = sdk1 || sdk2 || 'N/A';
 
   const modulePath = await locateModulePath();
-  if (modulePath) {
-    Console.success(`Module located at: ${modulePath}`);
-
-    const version = await fetchSystemOutput(
-      `sed -n 's/^version=//p' "${modulePath}/module.prop"`,
-      'N/A'
-    );
-    const description = await fetchSystemOutput(
-      `sed -n 's/^description=//p' "${modulePath}/module.prop"`,
-      'N/A'
-    );
-
-    document.getElementById('mod-version').textContent = version;
-    document.getElementById('mod-desc').textContent = description;
-
-    verifyReleaseStatus(description);
-
-    const { errno, stdout, stderr } = await executeNativeCommand(
-      `cat "${modulePath}/pif.json"`
-    );
-    if (errno === 0 && stdout) {
-      try {
-        const pifData = JSON.parse(stdout);
-        document.getElementById('mod-model').textContent =
-          pifData.MODEL || pifData.model || 'N/A';
-        document.getElementById('mod-manufacturer').textContent =
-          pifData.MANUFACTURER || pifData.manufacturer || 'N/A';
-        document.getElementById('mod-fingerprint').textContent =
-          pifData.FINGERPRINT || pifData.fingerprint || 'N/A';
-        document.getElementById('mod-patch').textContent =
-          pifData.SECURITY_PATCH || pifData.security_patch || 'N/A';
-        document.getElementById('mod-sdk').textContent =
-          pifData.DEVICE_INITIAL_SDK_INT ||
-          pifData.FIRST_API_LEVEL ||
-          pifData.first_api_level ||
-          'N/A';
-        Console.success('pif.json parsed and injected successfully.');
-      } catch (e) {
-        Console.error(`JSON Parse Error: ${e.message}`);
-        setModuleFallbackLabels('Parse Error');
-      }
-    } else {
-      Console.error(`Failed to read pif.json: ${stderr}`);
-      setModuleFallbackLabels('pif.json Not Found');
-    }
-  } else {
+  if (!modulePath) {
     Console.error('Target module *_beta_Props not found in /data/adb/modules/');
     setModuleFallbackLabels('Module Not Found');
+    return;
+  }
+
+  if (!/^\/data\/adb\/modules\/[a-zA-Z0-9_-]+$/.test(modulePath)) {
+    Console.error(`Invalid module path format: ${modulePath}`);
+    setModuleFallbackLabels('Invalid Module Path');
+    return;
+  }
+
+  Console.success(`Module located at: ${modulePath}`);
+
+  document.getElementById('module-path').textContent = modulePath;
+  document.getElementById('module-props-file').textContent = `${modulePath}/pif.json`;
+
+  const escapedPath = escapeShellArg(modulePath);
+
+  const [version, description] = await Promise.all([
+    fetchSystemOutput(
+      `sed -n 's/^version=//p' '${escapedPath}/module.prop'`,
+      'N/A'
+    ),
+    fetchSystemOutput(
+      `sed -n 's/^description=//p' '${escapedPath}/module.prop'`,
+      'N/A'
+    ),
+  ]);
+
+  document.getElementById('mod-version').textContent = version;
+  document.getElementById('mod-desc').textContent = description;
+
+  verifyReleaseStatus(description);
+
+  const { errno, stdout, stderr } = await executeNativeCommand(
+    `cat '${escapedPath}/pif.json'`
+  );
+
+  if (errno === 0 && stdout) {
+    try {
+      const pifData = JSON.parse(stdout);
+      document.getElementById('mod-model').textContent =
+        pifData.MODEL || pifData.model || 'N/A';
+      document.getElementById('mod-manufacturer').textContent =
+        pifData.MANUFACTURER || pifData.manufacturer || 'N/A';
+      document.getElementById('mod-fingerprint').textContent =
+        pifData.FINGERPRINT || pifData.fingerprint || 'N/A';
+      document.getElementById('mod-patch').textContent =
+        pifData.SECURITY_PATCH || pifData.security_patch || 'N/A';
+      document.getElementById('mod-sdk').textContent =
+        pifData.DEVICE_INITIAL_SDK_INT ||
+        pifData.FIRST_API_LEVEL ||
+        pifData.first_api_level ||
+        'N/A';
+      Console.success('pif.json parsed and injected successfully.');
+    } catch (e) {
+      Console.error(`JSON Parse Error: ${e.message}`);
+      setModuleFallbackLabels('Parse Error');
+    }
+  } else {
+    Console.error(`Failed to read pif.json: ${stderr}`);
+    setModuleFallbackLabels('pif.json Not Found');
   }
 }
 
 window.addEventListener('DOMContentLoaded', () => {
-  Console.init();
   setupNavigation();
   setupThemeConfiguration();
   setupIntentLinks();
   renderAboutSections();
   synchronizeSystemProperties();
+  initializePIFTools();
 });
