@@ -8,6 +8,8 @@ import { verifyReleaseStatus } from './ota-manager.js';
 import { setupIntentLinks } from './intent-handler.js';
 import { renderAboutSections } from './about-renderer.js';
 import { initializePIFTools } from './pif-ui-manager.js';
+import { readModulePifSource } from './pif-builder.js';
+import { renderModuleSettings, setupQuickActions } from './settings-manager.js';
 
 function escapeShellArg(arg) {
   if (typeof arg !== 'string') return '';
@@ -26,13 +28,22 @@ function setupNavigation() {
 
       const targetId = event.target.getAttribute('data-target');
       event.target.classList.add('active');
-      document.getElementById(targetId).classList.add('active');
+      const targetPage = document.getElementById(targetId);
+      if (targetPage) {
+        targetPage.classList.add('active');
+      }
+
+      if (targetId === 'content-settings') {
+        renderModuleSettings('module-config-container');
+      }
     });
   });
 }
 
 function setupThemeConfiguration() {
   const themeToggle = document.getElementById('theme-toggle');
+  if (!themeToggle) return;
+
   const toggleTheme = () => {
     const html = document.documentElement;
     const isDark = html.getAttribute('data-theme') === 'dark';
@@ -80,26 +91,18 @@ export async function synchronizeSystemProperties() {
       fetchSystemOutput('getprop ro.board.first_api_level', 'N/A'),
     ]);
 
-  document.getElementById('dev-model').textContent = model;
-  document.getElementById('dev-manufacturer').textContent = manufacturer;
-  document.getElementById('dev-fingerprint').textContent = fingerprint;
-  document.getElementById('dev-patch').textContent = patch;
+  document.getElementById('dev-model').textContent = model || 'N/A';
+  document.getElementById('dev-manufacturer').textContent = manufacturer || 'N/A';
+  document.getElementById('dev-fingerprint').textContent = fingerprint || 'N/A';
+  document.getElementById('dev-patch').textContent = patch || 'N/A';
   document.getElementById('dev-sdk').textContent = sdk1 || sdk2 || 'N/A';
 
   const modulePath = await locateModulePath();
   if (!modulePath) {
-    Console.error('Target module *_beta_Props not found in /data/adb/modules/');
+    Console.error('Target module not found in /data/adb/modules/');
     setModuleFallbackLabels('Module Not Found');
     return;
   }
-
-  if (!/^\/data\/adb\/modules\/[a-zA-Z0-9_-]+$/.test(modulePath)) {
-    Console.error(`Invalid module path format: ${modulePath}`);
-    setModuleFallbackLabels('Invalid Module Path');
-    return;
-  }
-
-  Console.success(`Module located at: ${modulePath}`);
 
   document.getElementById('module-path').textContent = modulePath;
   document.getElementById('module-props-file').textContent = `${modulePath}/pif.json`;
@@ -122,34 +125,21 @@ export async function synchronizeSystemProperties() {
 
   verifyReleaseStatus(description);
 
-  const { errno, stdout, stderr } = await executeNativeCommand(
-    `cat '${escapedPath}/pif.json'`
-  );
-
-  if (errno === 0 && stdout) {
-    try {
-      const pifData = JSON.parse(stdout);
-      document.getElementById('mod-model').textContent =
-        pifData.MODEL || pifData.model || 'N/A';
-      document.getElementById('mod-manufacturer').textContent =
-        pifData.MANUFACTURER || pifData.manufacturer || 'N/A';
-      document.getElementById('mod-fingerprint').textContent =
-        pifData.FINGERPRINT || pifData.fingerprint || 'N/A';
-      document.getElementById('mod-patch').textContent =
-        pifData.SECURITY_PATCH || pifData.security_patch || 'N/A';
-      document.getElementById('mod-sdk').textContent =
-        pifData.DEVICE_INITIAL_SDK_INT ||
-        pifData.FIRST_API_LEVEL ||
-        pifData.first_api_level ||
-        'N/A';
-      Console.success('pif.json parsed and injected successfully.');
-    } catch (e) {
-      Console.error(`JSON Parse Error: ${e.message}`);
-      setModuleFallbackLabels('Parse Error');
+  try {
+    const moduleProps = await readModulePifSource(modulePath);
+    if (moduleProps) {
+      document.getElementById('mod-model').textContent = moduleProps.MODEL || 'N/A';
+      document.getElementById('mod-manufacturer').textContent = moduleProps.MANUFACTURER || 'N/A';
+      document.getElementById('mod-fingerprint').textContent = moduleProps.FINGERPRINT || 'N/A';
+      document.getElementById('mod-patch').textContent = moduleProps.SECURITY_PATCH || 'N/A';
+      document.getElementById('mod-sdk').textContent = moduleProps.DEVICE_INITIAL_SDK_INT || 'N/A';
+      Console.success('Module properties parsed and injected successfully.');
+    } else {
+      setModuleFallbackLabels('Properties Not Found');
     }
-  } else {
-    Console.error(`Failed to read pif.json: ${stderr}`);
-    setModuleFallbackLabels('pif.json Not Found');
+  } catch (err) {
+    Console.error(`Error loading module properties: ${err.message}`);
+    setModuleFallbackLabels('Parse Error');
   }
 }
 
@@ -160,4 +150,5 @@ window.addEventListener('DOMContentLoaded', () => {
   renderAboutSections();
   synchronizeSystemProperties();
   initializePIFTools();
+  setupQuickActions();
 });
