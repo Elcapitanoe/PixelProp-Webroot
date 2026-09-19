@@ -1,33 +1,60 @@
 # Pixel Prop Webroot
 
-A lightweight, production-ready WebUI dashboard designed for managing Android system properties and certified fingerprints directly through KernelSU. 
+Zero-dependency WebUI dashboard and controller for Pixel Prop modules running on KernelSU and APatch environments.
 
-This project serves as the graphical interface for the Build-Prop-BETA module, providing real-time hardware telemetry and configuration management without relying on external dependencies.
+## Features
 
-## Key Features
+### Telemetry & Module Discovery
+- Three-tier dynamic module detection:
+  1. Native `ksu.moduleInfo()` API lookup.
+  2. Dynamic directory matching (`*[Pp]rops`) supporting both beta and non-beta modules.
+  3. Author metadata fallback from `module.prop`.
+- Live hardware telemetry comparing system `getprop` values against module spoof targets.
+- Dual property resolution reading `pif.json` with fallback directly to `system.prop`.
 
-* **Native KSU Integration**: Securely executes root-level shell commands (`getprop`, `cat`) via the built-in KernelSU JavaScript API.
-* **Real-Time Property Sync**: Automatically parses and visualizes system properties alongside module-specific configurations like `pif.json`.
-* **Automated OTA Verification**: Integrates directly with the GitHub API to compare local module versions against the latest release.
-* **Resilient Architecture**: Built with modular ES6 JavaScript, utilizing asynchronous command execution with built-in timeout fallbacks to prevent memory leaks.
-* **Dynamic Theming**: Fluid user interface utilizing CSS custom properties for seamless light and dark mode switching.
+### PIF Tools (Play Integrity Fix)
+- Quick Apply (Offline / Instant): Deploys the active module's certified fingerprint straight to `/data/adb/modules/playintegrityfix/pif.json` in under 0.2s without network requests.
+- Custom Online Build: Streams Google Beta OTA releases directly from stdout with zero temporary file disk overhead.
+- First-class Pixel 10 and Pixel 11 series support:
+  - Pixel 11 series: Kodiak (11 Pro XL), Grizzly (11 Pro), Cubs (11), Yogi (11 Pro Fold).
+  - Pixel 10 series: Mustang (10 Pro XL), Blazer (10 Pro), Frankel (10), Rango (10 Pro Fold), Stallion (10a).
+  - Legacy Pixel 6 through 9 series catalog.
+- Accurate API level resolution: Maps release OS versions to valid Android SDK levels (e.g. Android 17 maps to SDK 37) to prevent integrity attestation rejections.
 
-## Architecture & Stack
+### TrickyStore Integration
+- Targeted package discovery using native `ksu.listPackages()` with `pm` fallback.
+- Curated `target.txt` builder focused on Google Play Services, Play Store, and financial/banking applications rather than bulk-hooking all installed apps.
+- Hardware TEE broken state detection with automatic `!` bypass suffixing.
 
-This dashboard is built with a zero-dependency philosophy to ensure maximum performance and security within the root environment.
+### Runtime Configuration & Maintenance
+- In-app toggle controls for `config.prop` switches:
+  - `pixelprops.sensitive.props`
+  - `pixelprops.sensitive.pihooks`
+  - `pixelprops.sensitive.device`
+  - `pixelprops.sensitive.security_patch`
+  - `pixelprops.sensitive.sdk`
+- System quick actions:
+  - Clear Google Play Services (GMS) & Framework (GSF) data.
+  - Restart SystemUI.
+  - Device reboot.
 
-* **Frontend**: Vanilla HTML5, CSS3 (Flexbox/Grid, CSS Variables)
-* **Logic**: Vanilla JavaScript (ES6 Modules)
-* **API Communication**: Fetch API for GitHub releases and intent routing
-* **System Bridge**: KernelSU WebUI execution environment
+## Architecture
 
-## Development & Testing
-
-Since this WebUI relies on the KernelSU API (`ksu.exec`) for system-level operations, full functionality can only be tested directly on a rooted Android device with the module installed.
-
-1. Clone the repository.
-2. Package the files into your Magisk/KernelSU module zip.
-3. Flash the module via the KernelSU manager app.
-4. Open the module's WebUI directly from the manager dashboard.
-
-For UI and layout modifications, you can run a local development server (e.g., Live Server or Python `http.server`). Note that system properties will display fallback errors outside the KernelSU environment.
+```
+.
+├── index.html              # Core single-page application layout
+├── css/
+│   └── style.css           # Pure CSS variables, responsive grids, and toggle components
+├── js/
+│   ├── ksu-interface.js    # KernelSU JavaScript bridge, native APIs, and folder resolver
+│   ├── dashboard-core.js   # Navigation, telemetry syncing, and theme state
+│   ├── pif-builder.js      # Fingerprint generation, SDK mapping, and OTA parser
+│   ├── pif-ui-manager.js   # Wizard state engine with layout paint buffering
+│   ├── settings-manager.js # config.prop parser/writer and system execution tasks
+│   ├── tricky-store.js     # Target package filtering and target.txt manager
+│   ├── ota-manager.js      # GitHub release comparison client
+│   ├── intent-handler.js   # Android intent launcher via am start
+│   ├── about-renderer.js   # Contributor and repository card generator
+│   └── core-telemetry.js   # Lightweight console logger
+└── json/                   # Project metadata and contributor profiles
+```
