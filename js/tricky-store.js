@@ -1,11 +1,11 @@
 import { Console } from './core-telemetry.js';
-import { executeNativeCommand } from './ksu-interface.js';
+import { executeNativeCommand, listPackages } from './ksu-interface.js';
 
 const TRICKY_STORE_DIR = '/data/adb/tricky_store';
 const TARGET_FILE = `${TRICKY_STORE_DIR}/target.txt`;
 const TEE_STATUS_FILE = `${TRICKY_STORE_DIR}/tee_status`;
 
-const SPECIAL_PACKAGES = [
+const CORE_PACKAGES = [
   'com.google.android.gms',
   'com.google.android.gsf',
   'com.android.vending'
@@ -23,74 +23,71 @@ export async function checkTrickyStoreExists() {
 
 export async function checkTEEStatus() {
   const { stdout, errno } = await executeNativeCommand(`cat '${TEE_STATUS_FILE}' 2>/dev/null`);
-  
+
   if (errno === 0 && stdout.trim()) {
-    const teeBrokenMatch = stdout.match(/teeBroken=(true|1)/);
+    const teeBrokenMatch = stdout.match(/teeBroken=(true|1)/i);
     const isBroken = teeBrokenMatch !== null;
-    
-    Console.info(`TEE status: ${isBroken ? 'Broken (Hardware attestation not available)' : 'Working'}`);
-    return {
-      exists: true,
-      broken: isBroken
-    };
+
+    Console.info(`TEE status: ${isBroken ? 'Broken (Software attestation required)' : 'Working'}`);
+    return { exists: true, broken: isBroken };
   }
-  
-  Console.info('TEE status file not found, assuming working');
-  return {
-    exists: false,
-    broken: false
-  };
+
+  return { exists: false, broken: false };
 }
 
 export async function scanInstalledPackages() {
-  Console.info('Scanning installed packages...');
-  
-  const { stdout, errno } = await executeNativeCommand('pm list packages');
-  
-  if (errno !== 0) {
-    throw new Error('Failed to list installed packages');
+  const nativeList = listPackages('all');
+  if (Array.isArray(nativeList) && nativeList.length > 0) {
+    Console.success(`Found ${nativeList.length} packages via ksu native API`);
+    return nativeList;
   }
 
-  const packages = stdout
+  Console.info('Scanning installed packages via pm...');
+  const { stdout, errno } = await executeNativeCommand('pm list packages');
+  if (errno !== 0) {
+    return CORE_PACKAGES;
+  }
+
+  return stdout
     .split('\n')
     .filter(line => line.startsWith('package:'))
     .map(line => line.replace('package:', '').trim())
-    .filter(pkg => pkg.length > 0)
+    .filter(Boolean)
     .sort();
-  
-  Console.success(`Found ${packages.length} installed packages`);
-  return packages;
+}
+
+export function filterTargetPackages(packages) {
+  const targetSet = new Set(CORE_PACKAGES);
+
+  const sensitivePatterns = [
+    'bank', 'pay', 'wallet', 'dana', 'ovo', 'gopay', 'shopeepay',
+    'bca', 'mandiri', 'bri', 'bni', 'cimb', 'jago', 'aladin', 'jenius',
+    'linkaja', 'fintech', 'crypto', 'binance', 'tokocrypto', 'authenticator'
+  ];
+
+  packages.forEach(pkg => {
+    const lower = pkg.toLowerCase();
+    if (sensitivePatterns.some(pat => lower.includes(pat))) {
+      targetSet.add(pkg);
+    }
+  });
+
+  return Array.from(targetSet);
 }
 
 export async function buildTargetList(packages, teeBroken = false) {
-  Console.info('Building TrickyStore target list...');
-  
-  let targetList = [];
-  
-  if (teeBroken) {
-    Console.info('TEE is broken, adding ! suffix to all packages');
-    targetList = packages.map(pkg => `${pkg}!`);
-  } else {
-    targetList = packages.map(pkg => {
-      if (SPECIAL_PACKAGES.includes(pkg)) {
-        return `${pkg}!`;
-      }
-      return pkg;
-    });
-  }
-  
-  Console.success(`Built target list with ${targetList.length} entries`);
-  return targetList;
+  const targets = filterTargetPackages(packages);
+  Console.info(`Target list selected ${targets.length} essential/sensitive packages`);
+
+  return targets.map(pkg => (teeBroken ? `${pkg}!` : (CORE_PACKAGES.includes(pkg) ? `${pkg}!` : pkg)));
 }
 
 export async function backupExistingTarget() {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
   const backupPath = `${TARGET_FILE}.backup.${timestamp}`;
-  
   const { errno } = await executeNativeCommand(`test -f '${TARGET_FILE}' && cp '${TARGET_FILE}' '${backupPath}'`);
-  
   if (errno === 0) {
-    Console.success(`Backed up existing target.txt to ${backupPath}`);
+    Console.success(`Backed up existing target.txt`);
     return backupPath;
   }
   return null;
@@ -98,50 +95,29 @@ export async function backupExistingTarget() {
 
 export async function writeTargetFile(targetList) {
   Console.info('Writing target.txt to TrickyStore...');
-  
   const storeExists = await checkTrickyStoreExists();
   if (!storeExists) {
-    throw new Error('TrickyStore directory not found at ' + TRICKY_STORE_DIR);
+    throw new Error(`TrickyStore directory not found at ${TRICKY_STORE_DIR}`);
   }
 
   await backupExistingTarget();
-  
+
   const content = targetList.join('\n');
-  const tempFile = '/data/local/tmp/target_temp.txt';
-  
   const escapedContent = escapeShellArg(content);
-  const writeCmd = `echo '${escapedContent}' > '${tempFile}'`;
+  const writeCmd = `echo '${escapedContent}' > '${TARGET_FILE}'`;
   const { errno: writeErr } = await executeNativeCommand(writeCmd);
-  
+
   if (writeErr !== 0) {
-    throw new Error('Failed to write temporary target file');
+    throw new Error('Failed to write target.txt to TrickyStore');
   }
 
-  const { errno: moveErr } = await executeNativeCommand(`mv '${tempFile}' '${TARGET_FILE}'`);
-  
-  if (moveErr !== 0) {
-    await executeNativeCommand(`rm -f '${tempFile}'`);
-    throw new Error('Failed to move target file to TrickyStore directory');
-  }
-
-  const { stdout: lineCount, errno: verifyErr } = await executeNativeCommand(`wc -l < '${TARGET_FILE}'`);
-  
-  if (verifyErr === 0) {
-    const lines = parseInt(lineCount.trim());
-    Console.success(`Successfully wrote target.txt with ${lines} packages`);
-    return true;
-  }
-  
-  Console.success('Successfully wrote target.txt');
+  Console.success(`Successfully updated TrickyStore target.txt with ${targetList.length} packages`);
   return true;
 }
 
 export async function buildAndApplyTrickyStore() {
-  Console.info('Starting TrickyStore configuration...');
-  
   const storeExists = await checkTrickyStoreExists();
   if (!storeExists) {
-    Console.info('TrickyStore not found, skipping target.txt generation');
     return {
       success: false,
       message: 'TrickyStore not installed'
@@ -151,13 +127,13 @@ export async function buildAndApplyTrickyStore() {
   const teeStatus = await checkTEEStatus();
   const packages = await scanInstalledPackages();
   const targetList = await buildTargetList(packages, teeStatus.broken);
-  
+
   await writeTargetFile(targetList);
-  
+
   return {
     success: true,
     packagesCount: targetList.length,
     teeBroken: teeStatus.broken,
-    message: 'TrickyStore configuration completed'
+    message: 'TrickyStore updated'
   };
 }
