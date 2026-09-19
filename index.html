@@ -31,7 +31,7 @@
             </li>
             <li>
               <span class="prop-label">WebUI Version:</span>
-              <span class="prop-value">1.0.0</span>
+              <span class="prop-value">1.1.0</span>
             </li>
             <li>
               <span class="prop-label">Description:</span>
@@ -77,7 +77,7 @@
             </li>
           </ul>
         </div>
-      
+
         <div class="card">
           <h3>Module Properties</h3>
           <ul class="prop-list">
@@ -127,10 +127,22 @@
           <div class="wizard-content">
             <div class="wizard-step active" data-step="1">
               <div class="card">
-                <h3>Build Custom PIF Configuration</h3>
-                <p class="info-text">Select your device model and Android version to generate a custom PIF configuration from Google's Beta OTA releases.</p>
+                <h3>Quick Apply (Recommended)</h3>
+                <p class="info-text">
+                  Directly apply certified fingerprint from this installed module to PlayIntegrityFix. Instant, offline, and guaranteed matching.
+                </p>
                 <div class="method-actions">
-                  <button id="start-custom-build" class="btn-primary">Start Custom Build</button>
+                  <button id="quick-apply-pif" class="btn-primary">Apply Module Fingerprint</button>
+                </div>
+              </div>
+
+              <div class="card">
+                <h3>Custom Online Build</h3>
+                <p class="info-text">
+                  Fetch Google's latest Beta OTA releases online and select a custom device model or build ID.
+                </p>
+                <div class="method-actions">
+                  <button id="start-custom-build" class="btn-secondary">Start Custom Build</button>
                 </div>
               </div>
             </div>
@@ -168,11 +180,13 @@
                 <div id="apply-instructions" class="instructions-box hidden">
                   <h5>Important Next Steps</h5>
                   <ol>
-                    <li>Disconnect your device from Google account at <strong>myaccount.google.com/device-activity</strong></li>
-                    <li>Clear data from Google system apps (GMS, GSF, Google)</li>
+                    <li>Disconnect device from Google account at <strong>myaccount.google.com/device-activity</strong></li>
+                    <li>Clear data from Google Play Services (GMS) & Framework (GSF)</li>
                     <li>Restart your device</li>
-                    <li>Reconnect and verify device shows as configured model</li>
                   </ol>
+                  <button id="btn-clear-gms-wizard" class="btn-secondary" style="margin-top: 14px; width: 100%;">
+                    Clear Google Play Services (GMS)
+                  </button>
                 </div>
               </div>
             </div>
@@ -188,21 +202,19 @@
       </main>
 
       <main id="content-settings" class="page">
-        <div class="notice-card">
-          <strong class="notice-title">Development Notice</strong>
-          <p>
-            This WebUI is in active development. If you encounter bugs or have
-            suggestions, please report them to
-            <a
-              href="#"
-              data-url="https://github.com/Elcapitanoe/Build-Prop-BETA"
-              >@Elcapitanoe/Build-Prop-BETA</a
-            >.
-          </p>
-          <p class="notice-subtext">
-            <strong>Note:</strong> The "BETA" naming indicates the certified
-            fingerprint variant, not an unstable branch.
-          </p>
+        <div class="card">
+          <h3>Module Configuration</h3>
+          <p class="info-text">Runtime switches configured in config.prop and applied on boot.</p>
+          <div id="module-config-container" class="config-list"></div>
+        </div>
+
+        <div class="card">
+          <h3>Quick Actions</h3>
+          <div class="action-grid">
+            <button id="action-clear-gms" class="btn-secondary action-btn">Clear GMS Data</button>
+            <button id="action-restart-sysui" class="btn-secondary action-btn">Restart SystemUI</button>
+            <button id="action-reboot" class="btn-secondary action-btn">Reboot Device</button>
+          </div>
         </div>
 
         <div class="card">
@@ -213,6 +225,23 @@
               Switch to Light Mode
             </button>
           </div>
+        </div>
+
+        <div class="notice-card">
+          <strong class="notice-title">Development Notice</strong>
+          <p>
+            This WebUI is designed for Pixel Prop / Build-Prop-BETA modules.
+            If you encounter bugs or have suggestions, please report them to
+            <a
+              href="#"
+              data-url="https://github.com/Elcapitanoe/Build-Prop-BETA"
+              >@Elcapitanoe/Build-Prop-BETA</a
+            >.
+          </p>
+          <p class="notice-subtext">
+            <strong>Note:</strong> The "BETA" naming indicates the certified
+            fingerprint variant, not an unstable branch.
+          </p>
         </div>
       </main>
     </div>
